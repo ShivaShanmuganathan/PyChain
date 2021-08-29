@@ -1,2 +1,2 @@
 # PyChain
-Build a Blockchain from scratch in python.
+Building a Blockchain from scratch in python.
