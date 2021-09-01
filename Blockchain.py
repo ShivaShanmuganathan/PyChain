@@ -133,10 +133,11 @@ def get_chain():
 
 @app.route('/mine', methods=['GET'])
 def mining():
-    blockchain.add_new_transaction("Mike sends 10 BTC to Daniel")
+    blockchain.add_new_transaction("Daniel sends 10 BTC to Mike")
     new_block_index = blockchain.mine()
-    
-    return json.dumps({"mined block index": new_block_index})
+    get_chain()
+    #return json.dumps({"mined block index": new_block_index})
+
 
 app.run(debug=True, port=5000)
 
