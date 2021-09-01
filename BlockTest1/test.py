@@ -1,16 +1,11 @@
-import hashlib
 import json
-from textwrap import dedent
-from uuid import uuid4
-from flask import Flask
-from urllib.parse import urlparse
-
-from time import time
+import ecdsa
 from datetime import datetime
-import requests
+from blake3 import blake3
+from hashlib import sha256
 
 
-class Blockchain (object):
+class Blockchain ():
 	def __init__(self):
 		self.chain = [self.addGenesisBlock()]
 		self.pendingTransactions = []
@@ -19,9 +14,9 @@ class Blockchain (object):
 		self.blockSize = 10
 		self.nodes = set()
 
-	def register_node(self, address):
-		parsedUrl = urlparse(address)
-		self.nodes.add(parsedUrl.netloc)
+	# def register_node(self, address):
+	# 	parsedUrl = urlparse(address)
+	# 	self.nodes.add(parsedUrl.netloc)
 
 	def displayChain(self):
 		return self.chain
@@ -43,7 +38,7 @@ class Blockchain (object):
 				transactionSlice = self.pendingTransactions[i:end]
 
 				newBlock = Block(transactionSlice, datetime.now().strftime("%m/%d/%Y, %H:%M:%S"), len(self.chain))
-				#print(type(self.getLastBlock()))
+				
 
 				hashVal = self.getLastBlock().hash
 				newBlock.prev = hashVal
@@ -58,22 +53,18 @@ class Blockchain (object):
 
 		return True
 
-	def addTransaction(self, sender, reciever, amt, keyString, senderKey):
-		keyByte = keyString.encode("ASCII")
-		senderKeyByte = senderKey.encode("ASCII")
+	def addTransaction(self, sender, receiver, amt, senderKey):
+		#DECODE SENDER RECEIVER KEY IN test FILE
+		
 
-		#print(type(keyByte), keyByte)
-
-		key = RSA.import_key(keyByte)
-		senderKey = RSA.import_key(senderKeyByte)
-
-		if not sender or not reciever or not amt:
+		if not sender or not receiver or not amt:
 			print("transaction error 1")
 			return False
 
-		transaction = Transaction(sender, reciever, amt)
+		transaction = Transaction(sender, receiver, amt)
 
-		transaction.signTransaction(key, senderKey)
+		if not transaction.signTransaction(senderKey):
+			return False
 
 		if not transaction.isValidTransaction():
 			print("transaction error 2")
@@ -112,18 +103,18 @@ class Blockchain (object):
 				return False
 		return True
 
-	def generateKeys(self):
-		key = RSA.generate(2048)
-		private_key = key.export_key()
-		file_out = open("private.pem", "wb")
-		file_out.write(private_key)
+	# def generateKeys(self):
+	# 	key = RSA.generate(2048)
+	# 	private_key = key.export_key()
+	# 	file_out = open("private.pem", "wb")
+	# 	file_out.write(private_key)
 
-		public_key = key.publickey().export_key()
-		file_out = open("receiver.pem", "wb")
-		file_out.write(public_key)
+	# 	public_key = key.publickey().export_key()
+	# 	file_out = open("receiver.pem", "wb")
+	# 	file_out.write(public_key)
 		
-		print(public_key.decode('ASCII'))
-		return key.publickey().export_key().decode('ASCII')
+	# 	print(public_key.decode('ASCII'))
+	# 	return key.publickey().export_key().decode('ASCII')
 
 
 		
@@ -136,23 +127,21 @@ class Blockchain (object):
 					transaction = block.transactions[j]
 					if(transaction.sender == person):
 						balance -= transaction.amt
-					if(transaction.reciever == person):
+					if(transaction.receiver == person):
 						balance += transaction.amt
 			except AttributeError:
 				print("no transaction")
 		return balance + 100
 
 
-class Block (object):
+class Block ():
 	def __init__(self, transactions, time, index):
 		self.index = index
 		self.transactions = transactions
 		self.time = time
 		self.prev = ''
 		self.nonse = 0
-
 		self.hash = self.calculateHash()
-
 
 
 	def calculateHash(self):
@@ -163,7 +152,7 @@ class Block (object):
 			hashTransactions += transaction.hash
 		hashString = str(self.time) + hashTransactions + self.prev + str(self.nonse)
 		hashEncoded = json.dumps(hashString, sort_keys=True).encode()
-		return hashlib.sha256(hashEncoded).hexdigest()
+		return blake3(hashEncoded).hexdigest()
 
 	def mineBlock(self, difficulty):
 		arr = []
@@ -175,6 +164,7 @@ class Block (object):
 		hashPuzzle = ''.join(arrStr)
 		
 		while self.hash[0:difficulty] != hashPuzzle:
+			print("Please Hold On, ⛏️⛏️⛏️ MINING BLOCK ⛏️⛏️⛏️ \n")
 			self.nonse += 1
 			self.hash = self.calculateHash()
 			
@@ -189,50 +179,53 @@ class Block (object):
 			return True
 	
 	
-class Transaction (object):
-	def __init__(self, sender, reciever, amt):
+class Transaction ():
+	def __init__(self, sender, receiver, amt):
 		self.sender = sender
-		self.reciever = reciever
+		self.receiver = receiver
 		self.amt = amt
 		self.time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S") #change to current date
 		self.hash = self.calculateHash()
 
 
 	def calculateHash(self):
-		hashString = self.sender + self.reciever + str(self.amt) + str(self.time)
+		hashString = self.sender + self.receiver + str(self.amt) + str(self.time)
 		hashEncoded = json.dumps(hashString, sort_keys=True).encode()
-		return hashlib.sha256(hashEncoded).hexdigest()
+		return blake3(hashEncoded).hexdigest()
+		
 
 	def isValidTransaction(self):
-
+		#VERIFY TRANSACTION
 		if(self.hash != self.calculateHash()):
 			return False
-		if(self.sender == self.reciever):
+		if(self.sender == self.receiver):
 			return False
 		if(self.sender == "Miner Rewards"):
 			#security : unfinished
 			return True
-		if not self.signature or len(self.signature) == 0:
-			print("No Signature!")
+		#Using Public Key to verify 
+		msg = str(self.amt).encode()
+		public_key = ecdsa.VerifyingKey.from_string(bytes.fromhex(self.sender), curve=ecdsa.SECP256k1)
+		print("\n")
+		print(public_key)
+		print("\n")
+		#print("msg", msg)
+		verify = public_key.verify(self.signature, msg)
+		if not self.signature or not verify:
+			print("Signature Invalid")
 			return False
 		return True
-		#needs work!
-
-	def signTransaction(self, key, senderKey):
+		
+	def signTransaction(self, senderKey):
+		msg = str(self.amt).encode()
+		print("msg", msg)
+		print("\n")
+		private_key = ecdsa.SigningKey.from_string(bytes.fromhex(senderKey), curve=ecdsa.SECP256k1)
 		if(self.hash != self.calculateHash()):
 			print("transaction tampered error")
 			return False
-		#print(str(key.publickey().export_key()))
-		#print(self.sender)
-		if(str(key.publickey().export_key()) != str(senderKey.publickey().export_key())):
-			print("Transaction attempt to be signed from another wallet")
-			return False
-
-		#h = MD5.new(self.hash).digest()
-
-		pkcs1_15.new(key)
-
-		self.signature = "made"
-		#print(key.sign(self.hash, ""))
-		print("made signature!")
+		# Signing Transaction
+		print("private_key", private_key)
+		self.signature = private_key.sign(msg)
+		
 		return True
