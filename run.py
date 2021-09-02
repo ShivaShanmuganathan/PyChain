@@ -1,4 +1,4 @@
-from test import Blockchain
+from blockchain import Blockchain
 import ecdsa
 import base64
 
