@@ -2,8 +2,7 @@ import json
 import ecdsa
 from datetime import datetime
 from blake3 import blake3
-from hashlib import sha256
-
+import base64
 
 class Blockchain ():
 	def __init__(self):
@@ -14,13 +13,25 @@ class Blockchain ():
 		self.blockSize = 10
 		self.nodes = set()
 
-	# def register_node(self, address):
-	# 	parsedUrl = urlparse(address)
-	# 	self.nodes.add(parsedUrl.netloc)
-
+	
 	def displayChain(self):
-		return self.chain
-
+		
+		for block in self.chain:
+			print("----------------------------------")
+			print("Block Index: ",block.index)
+			print("Block Transactions: ",block.transactions)
+			print("Block Hash: ",block.hash)
+			print("Block PrevHash: ",block.prev)
+			print("\n")
+			print("Transaction List: \n")
+			for transaction in block.transactions:
+				print("Sender: ", transaction.sender)
+				print("Receiver: ", transaction.receiver)
+				print("Transaction Id 🎟️ :", transaction.id)
+				print("Transaction Amount 🪙:", transaction.amt, "\n")
+			print("----------------------------------")
+			print("\n")
+			
 
 	def minePendingTransactions(self, miner):
 		
@@ -32,20 +43,19 @@ class Blockchain ():
 			for i in range(0, lenPT, self.blockSize):
 
 				end = i + self.blockSize
+
 				if i >= lenPT:
 					end = lenPT
-				
+
 				transactionSlice = self.pendingTransactions[i:end]
-
 				newBlock = Block(transactionSlice, datetime.now().strftime("%m/%d/%Y, %H:%M:%S"), len(self.chain))
-				
-
 				hashVal = self.getLastBlock().hash
 				newBlock.prev = hashVal
 				newBlock.mineBlock(self.difficulty)
+
 				if self.isValidChain():
 					self.chain.append(newBlock)
-					print("Mining Transactions Success!")
+					print("Adding a new Block!")
 					payMiner = Transaction("Miner Rewards", miner, self.minerRewards)
 					self.pendingTransactions = [payMiner]
 				else:
@@ -56,14 +66,13 @@ class Blockchain ():
 	def addTransaction(self, sender, receiver, amt, senderKey):
 		#DECODE SENDER RECEIVER KEY IN test FILE
 		
-
 		if not sender or not receiver or not amt:
 			print("transaction error 1")
 			return False
 
 		transaction = Transaction(sender, receiver, amt)
 
-		if not transaction.signTransaction(senderKey):
+		if not transaction.sign_tx(senderKey):
 			return False
 
 		if not transaction.isValidTransaction():
@@ -78,7 +87,7 @@ class Blockchain ():
 
 	def addGenesisBlock(self):
 		tArr = []
-		tArr.append(Transaction("me", "you", 10))
+		tArr.append(Transaction("Satoshi", "Me", 10))
 		genesis = Block(tArr, datetime.now().strftime("%m/%d/%Y, %H:%M:%S"), 0)
 
 		genesis.prev = "None"
@@ -102,21 +111,6 @@ class Blockchain ():
 				print("error 5")
 				return False
 		return True
-
-	# def generateKeys(self):
-	# 	key = RSA.generate(2048)
-	# 	private_key = key.export_key()
-	# 	file_out = open("private.pem", "wb")
-	# 	file_out.write(private_key)
-
-	# 	public_key = key.publickey().export_key()
-	# 	file_out = open("receiver.pem", "wb")
-	# 	file_out.write(public_key)
-		
-	# 	print(public_key.decode('ASCII'))
-	# 	return key.publickey().export_key().decode('ASCII')
-
-
 		
 	def getBalance(self, person):
 		balance = 0 
@@ -131,7 +125,7 @@ class Blockchain ():
 						balance += transaction.amt
 			except AttributeError:
 				print("no transaction")
-		return balance + 100
+		return balance
 
 
 class Block ():
@@ -149,7 +143,7 @@ class Block ():
 		hashTransactions = ""
 
 		for transaction in self.transactions:
-			hashTransactions += transaction.hash
+			hashTransactions += transaction.id
 		hashString = str(self.time) + hashTransactions + self.prev + str(self.nonse)
 		hashEncoded = json.dumps(hashString, sort_keys=True).encode()
 		return blake3(hashEncoded).hexdigest()
@@ -164,9 +158,10 @@ class Block ():
 		hashPuzzle = ''.join(arrStr)
 		
 		while self.hash[0:difficulty] != hashPuzzle:
-			print("Please Hold On, ⛏️⛏️⛏️ MINING BLOCK ⛏️⛏️⛏️ \n")
 			self.nonse += 1
 			self.hash = self.calculateHash()
+			if ((self.nonse % 100) == 0):
+				print("⌛Please Hold On , ⛏️⛏️ MINING BLOCK ⛏️⛏️ \n")
 			
 		print("Block Mined!")
 		return True
@@ -185,47 +180,51 @@ class Transaction ():
 		self.receiver = receiver
 		self.amt = amt
 		self.time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S") #change to current date
-		self.hash = self.calculateHash()
+		self.id = self.calculateHash()
 
 
 	def calculateHash(self):
-		hashString = self.sender + self.receiver + str(self.amt) + str(self.time)
+		hashString = str(self.sender) + str(self.receiver) + str(self.amt) + str(self.time)
 		hashEncoded = json.dumps(hashString, sort_keys=True).encode()
 		return blake3(hashEncoded).hexdigest()
 		
 
 	def isValidTransaction(self):
 		#VERIFY TRANSACTION
-		if(self.hash != self.calculateHash()):
+		
+		if(self.id != self.calculateHash()):
+			print("Hash Problem \n")
 			return False
+		
 		if(self.sender == self.receiver):
+			print("Sender = Receiver, Please Change Receiver Address \n")
 			return False
+		
 		if(self.sender == "Miner Rewards"):
-			#security : unfinished
+			#Needs More Work
 			return True
+		
+
 		#Using Public Key to verify 
-		msg = str(self.amt).encode()
-		public_key = ecdsa.VerifyingKey.from_string(bytes.fromhex(self.sender), curve=ecdsa.SECP256k1)
-		print("\n")
-		print(public_key)
-		print("\n")
-		#print("msg", msg)
-		verify = public_key.verify(self.signature, msg)
-		if not self.signature or not verify:
-			print("Signature Invalid")
-			return False
-		return True
+		message = str(self.amt)
+		public_key = (base64.b64decode(self.sender)).hex()
+		signature = base64.b64decode(self.signature)
+		vk = ecdsa.VerifyingKey.from_string(bytes.fromhex(public_key), curve=ecdsa.SECP256k1)
+		verify = vk.verify(signature, message.encode())
 		
-	def signTransaction(self, senderKey):
-		msg = str(self.amt).encode()
-		print("msg", msg)
-		print("\n")
-		private_key = ecdsa.SigningKey.from_string(bytes.fromhex(senderKey), curve=ecdsa.SECP256k1)
-		if(self.hash != self.calculateHash()):
-			print("transaction tampered error")
+		if verify:
+			print("Transaction Verified! \n")
+			return True
+		else:
+			print("Signature Verification Error")
 			return False
-		# Signing Transaction
-		print("private_key", private_key)
-		self.signature = private_key.sign(msg)
 		
+	def sign_tx(self, private_key):
+    
+		message = str(self.amt)
+		bmessage = message.encode()
+		sk = ecdsa.SigningKey.from_string(bytes.fromhex(private_key), curve=ecdsa.SECP256k1)
+		signature = base64.b64encode(sk.sign(bmessage))
+		self.signature = signature 
+
 		return True
