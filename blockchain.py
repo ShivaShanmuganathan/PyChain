@@ -11,7 +11,7 @@ class Blockchain ():
 		self.difficulty = 2
 		self.minerRewards = 50
 		self.blockSize = 10
-		self.nodes = set()
+		
 
 	
 	def displayChain(self):
