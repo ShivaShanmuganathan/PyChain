@@ -36,3 +36,16 @@ I still need to work on distributed consensus part.
 
 
 #### If you are unable to see emojis in the output, try running the container from the terminal of code editor (Works in VS Code)
+------------------------------------------------------------------------------------------------------------------------------------
+
+## :mag: How does it work?
+
+### Run.py 
+1. Generate Keys for sender1, sender2, receiver, and miner
+2. Create the blockchain
+3. Add Transaction [Sender1 sends money to Receiver]
+4. Add another Transaction [Sender2 sends money to Receiver]
+5. Miner validates the pending transactions, adds the transaction to a block, mines the block, and adds it to the Blockchain
+6. We can see the status of the Blockchain
+7. We can see the account balance of the Receiver
+
