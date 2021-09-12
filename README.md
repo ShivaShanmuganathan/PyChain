@@ -3,6 +3,14 @@
 ## :snake: Building a Blockchain from scratch in Python.
 ### :link: I built this Blockchain in Python to better understand how a Blockchain works
 
+![block1](https://user-images.githubusercontent.com/30176438/132985082-3256a981-01d6-4149-a154-a131ca27bde1.png)
+![block2](https://user-images.githubusercontent.com/30176438/132985076-b6956ee6-4834-4a16-bc6e-d926af51bfa6.png)
+![block3](https://user-images.githubusercontent.com/30176438/132985081-43ab9138-c8b1-49ab-a82b-29c70d2e9c19.png)
+
+
+
+
+
 ## :rocket: What did I learn?
 
 1. How a Transaction is validated & verified before adding it to a Block
